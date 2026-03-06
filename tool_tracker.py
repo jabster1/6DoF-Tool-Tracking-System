@@ -6,7 +6,7 @@ import time
 # Load pre-trained model
 model = YOLO("yolo11n.pt") 
 
-# Define your shadowboard zone [x1, y1, x2, y2]
+# Define bounding box zone [x1, y1, x2, y2]
 SHADOWBOARD_ZONE = [100, 100, 900, 700]
 
 # Track tool states
@@ -26,13 +26,14 @@ def log_event(tool_id, status, timestamp, class_name):
     current_time = time.time()
     
     # Only log if 15 seconds have passed since last log for this tool
+    # helps to not overload outputs and only checks for tools in time increments
     if tool_id not in last_log_time or (current_time - last_log_time[tool_id]) >= LOG_INTERVAL:
         message = f"[{timestamp}] {class_name} (ID: {tool_id}): {status}"
         
         # Print to console
         print(message)
         
-        # Write to file
+        # Write to file to keep track of what tools are there and not there
         with open(LOG_FILE, 'a') as f:
             f.write(message + '\n')
         
@@ -63,6 +64,7 @@ def check_missing_tools(currently_detected, timestamp):
                 tool_states[tool_id] = "MISSING"
                 log_event(tool_id, "MISSING FROM ZONE", timestamp, info['class_name'])
 
+#initiate webcam or phone camera setup
 cap = cv2.VideoCapture(0)
 
 print("Starting camera... Press 'q' to quit")
@@ -122,7 +124,7 @@ while cap.isOpened():
                         'position': (cx, cy)
                     }
 
-                # FIXED LOGIC: Only log when status changes AND enough time has passed
+                # Only log when status changes and enough time has passed
                 # Only log if NOT in calibration mode
                 if not CALIBRATION_MODE:
                     if track_id not in tool_states:
