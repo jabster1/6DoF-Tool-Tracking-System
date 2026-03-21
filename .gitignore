@@ -4,3 +4,5 @@ __pycache__/
 *.pt
 *.onnx
 datasets/
+.DS_Store
+runs/
