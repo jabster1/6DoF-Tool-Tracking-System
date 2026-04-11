@@ -4,7 +4,7 @@ from datetime import datetime
 import time
 
 # Load pre-trained model
-model = YOLO("yolo11n.pt") 
+model = YOLO("best.pt") 
 
 # Define bounding box zone [x1, y1, x2, y2]
 SHADOWBOARD_ZONE = [100, 100, 900, 700]
