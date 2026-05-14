@@ -1,4 +1,4 @@
-# 6DoF Tool Tracking System
+# 6DoF Edge Tool Tracking System
 
 A real-time computer vision system for industrial tool tracking using a fine tuned YOLOv11 model. Designed to monitor tools entering and exiting designated work areas, automatically logging check-in/check-out events to prevent Foreign Object Debris (FOD) incidents and reduce costly equipment loss in aerospace and power generation environments.
 
@@ -62,9 +62,13 @@ Webcam Feed ──▶ ONNX Runtime (C++ Inference) ──▶ 6DoF Pose Estimator
 | Real-time YOLOv11 inference on webcam feed | ✅ Complete |
 | Multi-class detection (drill, pliers, screwdriver) | ✅ Complete |
 | Tool check-in/check-out logging | ✅ Complete |
-| Fine-tuning on domain-specific industrial toolset | 🔄 In Progress |
-| ONNX model export for C++ deployment | 🔄 In Progress |
-| C++ inference pipeline via ONNX Runtime | 🔄 In Progress |
+| Fine-tuning on domain-specific industrial toolset | ✅ Complete  |
+| ONNX model export for C++ deployment | ✅ Complete  |
+| C++ inference pipeline via ONNX Runtime | ✅ Complete  |
+| ByteTrack implementation for linking detection across frames and apply specific ID to tools | In Progress |
+| Logging to track and audit tools based on ID | In Progress |
+| Quantization of model for Edge Devices | In Progress |
+| TensorRT implementation and Jetson Orin Nano Hardware Integration | In Progress |
 | 6DoF pose estimation integration | 📅 Planned |
 | Enterprise system integration | 📅 Planned |
 
