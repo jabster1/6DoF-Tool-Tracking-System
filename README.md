@@ -65,8 +65,8 @@ Webcam Feed ──▶ ONNX Runtime (C++ Inference) ──▶ 6DoF Pose Estimator
 | Fine-tuning on domain-specific industrial toolset | ✅ Complete  |
 | ONNX model export for C++ deployment | ✅ Complete  |
 | C++ inference pipeline via ONNX Runtime | ✅ Complete  |
-| ByteTrack implementation for linking detection across frames and apply specific ID to tools | In Progress |
-| Logging to track and audit tools based on ID | In Progress |
+| ByteTrack implementation for linking detection across frames and apply specific ID to tools | ✅ Complete |
+| Logging to track and audit tools based on ID | ✅ Complete |
 | Quantization of model for Edge Devices | In Progress |
 | TensorRT implementation and Jetson Orin Nano Hardware Integration | In Progress |
 | 6DoF pose estimation integration | 📅 Planned |
