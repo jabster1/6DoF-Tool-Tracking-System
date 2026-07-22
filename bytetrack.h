@@ -216,6 +216,7 @@ inline std::vector<int> lap_solve(const std::vector<std::vector<float>>& cost,
                 if(r<minv[j]){ minv[j]=r; way[j]=j0; }
                 if(minv[j]<delta){ delta=minv[j]; j1=j; }
             }
+            if(j1 < 0) break;
             for(int j=0;j<=n;++j){
                 if(used[j]){ u[p[j]]+=delta; v[j]-=delta; }
                 else        minv[j]-=delta;

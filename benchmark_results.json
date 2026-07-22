@@ -3,8 +3,8 @@
   "model": "best.pt",
   "imgsz": 512,
   "frames": 100,
-  "avg_inference_ms": 104.6269,
-  "fps": 9.5578,
-  "min_inference_ms": 85.3732,
-  "max_inference_ms": 406.574
+  "avg_inference_ms": 110.2247,
+  "fps": 9.0724,
+  "min_inference_ms": 89.0753,
+  "max_inference_ms": 379.8738
 }

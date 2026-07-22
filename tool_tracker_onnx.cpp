@@ -45,8 +45,8 @@ static constexpr int   INPUT_W         = 512;
 static constexpr int   INPUT_H         = 512;
 static constexpr float CONF_THRESHOLD  = 0.10f;  // low threshold passed to ByteTrack
 static constexpr float NMS_IOU         = 0.45f;
-static constexpr int   CONFIRM_FRAMES  = 10;      // consecutive visible frames before DETECTED
-static constexpr int   ABSENT_FRAMES   = 15;      // consecutive absent frames before REMOVED
+static constexpr int   CONFIRM_FRAMES  = 5;      // consecutive visible frames before DETECTED
+static constexpr int   ABSENT_FRAMES   = 30;      // consecutive absent frames before REMOVED
 static constexpr double ALERT_SEC      = 60.0;    // seconds absent before ALERT
 
 static const std::string MODEL_PATH    = "best.onnx";

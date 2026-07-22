@@ -4,8 +4,8 @@
   "provider": "CoreML",
   "imgsz": 512,
   "frames": 100,
-  "avg_inference_ms": 67.7601,
-  "fps": 14.7579,
-  "min_inference_ms": 48.5294,
-  "max_inference_ms": 159.8555
+  "avg_inference_ms": 71.5295,
+  "fps": 13.9803,
+  "min_inference_ms": 52.6183,
+  "max_inference_ms": 163.2792
 }
