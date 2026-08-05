@@ -43,7 +43,7 @@
 
 static constexpr int   INPUT_W         = 512;
 static constexpr int   INPUT_H         = 512;
-static constexpr float CONF_THRESHOLD  = 0.10f;  // low threshold passed to ByteTrack
+static constexpr float CONF_THRESHOLD  = 0.35f;  // threshold passed to ByteTrack, increased a little to filter out weak ghost detections
 static constexpr float NMS_IOU         = 0.45f;
 static constexpr int   CONFIRM_FRAMES  = 5;      // consecutive visible frames before DETECTED
 static constexpr int   ABSENT_FRAMES   = 30;      // consecutive absent frames before REMOVED
@@ -291,8 +291,8 @@ static void draw_hud(cv::Mat& frame,
                         cv::FONT_HERSHEY_SIMPLEX, 0.48, cv::Scalar(0,0,0), 1, cv::LINE_AA);
 
         } else if(rec.state == ToolState::PENDING) {
-            // Thin yellow box while accumulating confirmation frames
-            draw_dashed_rect(frame, box, cv::Scalar(0,220,220), 1);
+            // Thin yellow box while accumulating confirmation frames, commented out so we have a cleaner demo and no ghost boxes
+            //draw_dashed_rect(frame, box, cv::Scalar(0,220,220), 1);
 
         } else if(rec.state == ToolState::MISSING) {
             // Ghost box at last known position
