@@ -7,3 +7,5 @@ datasets/
 .DS_Store
 industrial-tools-v1.zip
 runs/
+build/
+tool_log.txt
