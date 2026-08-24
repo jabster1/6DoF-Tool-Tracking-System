@@ -1,8 +1,0 @@
-/Users/jadenbarnwell/Desktop/tool_tracker/Tool-Tracking-System/build/CMakeFiles/benchmark_cpp.dir
-/Users/jadenbarnwell/Desktop/tool_tracker/Tool-Tracking-System/build/CMakeFiles/tool_tracker_onnx.dir
-/Users/jadenbarnwell/Desktop/tool_tracker/Tool-Tracking-System/build/CMakeFiles/edit_cache.dir
-/Users/jadenbarnwell/Desktop/tool_tracker/Tool-Tracking-System/build/CMakeFiles/rebuild_cache.dir
-/Users/jadenbarnwell/Desktop/tool_tracker/Tool-Tracking-System/build/CMakeFiles/list_install_components.dir
-/Users/jadenbarnwell/Desktop/tool_tracker/Tool-Tracking-System/build/CMakeFiles/install.dir
-/Users/jadenbarnwell/Desktop/tool_tracker/Tool-Tracking-System/build/CMakeFiles/install/local.dir
-/Users/jadenbarnwell/Desktop/tool_tracker/Tool-Tracking-System/build/CMakeFiles/install/strip.dir
