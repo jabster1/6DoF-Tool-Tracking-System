@@ -31,9 +31,14 @@
 #include <sstream>
 #include <string>
 #include <vector>
+// ADD for TensorRT
+#include <NvInfer.h>
+#include <NvOnnxParser.h>
+#include <cuda_runtime_api.h>
 
 #include <opencv2/opencv.hpp>
-#include <onnxruntime_cxx_api.h>
+//take out for TensorRT
+//#include <onnxruntime_cxx_api.h>
 
 #include "bytetrack.h"
 
@@ -428,36 +433,52 @@ static void write_summary(const std::map<int,ToolRecord>& active_records,
     std::cout << "Session summary written to " << SUMMARY_FILE << "\n";
 }
 
+class TRTLogger : public nvinfer1::ILogger {
+    void log(Severity severity, const char* msg) noexcept override {
+        if (severity <= Severity::kWARNING) std::cerr << msg << "\n";
+    }
+} trt_logger;
+
+
 // ─────────────────────────────────────────────────────────────────────────────
 // main
 // ─────────────────────────────────────────────────────────────────────────────
 
 int main() {
     // ── ONNX Runtime ─────────────────────────────────────────────────────
+    /* Pre TensorRT - CPU
     Ort::Env env(ORT_LOGGING_LEVEL_WARNING, "tool_tracker");
     Ort::SessionOptions opts;
     opts.SetIntraOpNumThreads(4);
     opts.SetGraphOptimizationLevel(GraphOptimizationLevel::ORT_ENABLE_ALL);
-    // For Jetson Orin Nano Super, swap in TensorRT EP here:
-    //   Ort::ThrowOnError(OrtSessionOptionsAppendExecutionProvider_Tensorrt(opts, 0));
-
     std::cout << "Loading " << MODEL_PATH << " ...\n";
     Ort::Session session(env, MODEL_PATH.c_str(), opts);
+    */
+    // 01 TensorRT Load Engine implementation 
+    std::ifstream engineFile("best.engine", std::ios::binary);
+    std::vector<char> engineData((std::istreambuf_iterator<char>(engineFile)), std::istreambuf_iterator<char>());
+    nvinfer1::IRuntime* runtime = nvinfer1::createInferRuntime(trt_logger);
+    nvinfer1::ICudaEngine* engine = runtime->deserializeCudaEngine(engineData.data(), engineData.size());
+    nvinfer1::IExecutionContext* context = engine->createExecutionContext();
 
-    Ort::AllocatorWithDefaultOptions alloc;
-    auto in_name_ptr  = session.GetInputNameAllocated(0, alloc);
-    auto out_name_ptr = session.GetOutputNameAllocated(0, alloc);
-    std::string in_name  = in_name_ptr.get();
-    std::string out_name = out_name_ptr.get();
+    std::string in_name, out_name;
+    for (int i = 0; i < engine->getNbIOTensors(); ++i) {
+        const char* name = engine->getIOTensorName(i);
+        if (engine->getTensorIOMode(name) == nvinfer1::TensorIOMode::kINPUT) in_name = name;
+        else out_name = name;
+    }
 
-    auto out_shape  = session.GetOutputTypeInfo(0).GetTensorTypeAndShapeInfo().GetShape();
-    int  n_classes  = (out_shape.size()>=2 && out_shape[1]>4)
-                    ? (int)out_shape[1]-4 : (int)CLASS_NAMES.size();
+    nvinfer1::Dims out_dims_static = engine->getTensorShape(out_name.c_str());
+    int n_classes = (out_dims_static.nbDims >= 2 && out_dims_static.d[1] > 4)
+                  ? out_dims_static.d[1] - 4 : (int)CLASS_NAMES.size();
+    int n_anchors = (out_dims_static.nbDims >= 3) ? out_dims_static.d[2] : 0;
 
-    std::array<int64_t,4> in_shape{1,3,INPUT_H,INPUT_W};
-    const size_t in_numel = 3*INPUT_H*INPUT_W;
-    const char* in_names[]  = {in_name.c_str()};
-    const char* out_names[] = {out_name.c_str()};
+    const size_t in_numel = 3 * INPUT_H * INPUT_W;
+    size_t out_numel = 1;
+    for (int d = 0; d < out_dims_static.nbDims; ++d) out_numel *= out_dims_static.d[d];
+
+    cudaStream_t stream;
+    cudaStreamCreate(&stream);
 
     // ── Log file ─────────────────────────────────────────────────────────
     g_log.open(LOG_FILE, std::ios::app);
@@ -496,7 +517,16 @@ int main() {
     std::vector<double> fps_buf;
     fps_buf.reserve(30);
 
+    //02 TensorRT allocate buffers
+    void* buffers[2];
+    cudaMalloc(&buffers[0], in_numel * sizeof(float));
+    cudaMalloc(&buffers[1], out_numel * sizeof(float));
+
+    context->setTensorAddress(in_name.c_str(), buffers[0]);
+    context->setTensorAddress(out_name.c_str(), buffers[1]);
+
     // ── Main loop ─────────────────────────────────────────────────────────
+    //Loop through every frame
     while(true) {
         cv::Mat frame; cap.read(frame);
         if(frame.empty()) { std::cerr << "Warning: empty frame.\n"; continue; }
@@ -507,6 +537,7 @@ int main() {
         float scale; int pad_l, pad_t;
         auto blob = preprocess(frame, scale, pad_l, pad_t);
 
+        /*old cpu copy in copy out
         Ort::MemoryInfo mi = Ort::MemoryInfo::CreateCpu(OrtArenaAllocator,OrtMemTypeDefault);
         Ort::Value in_tensor = Ort::Value::CreateTensor<float>(
             mi, blob.data(), in_numel, in_shape.data(), in_shape.size());
@@ -515,10 +546,17 @@ int main() {
                                    in_names, &in_tensor, 1, out_names, 1);
 
         const float* out_data = outputs[0].GetTensorData<float>();
-        auto out_dims = outputs[0].GetTensorTypeAndShapeInfo().GetShape();
-        int n_anchors = (out_dims.size()>=3) ? (int)out_dims[2] : 0;
+        */
 
-        std::vector<TBox> dets = postprocess(out_data, n_anchors, n_classes,
+        //03-05 TensorRT copy into GPU, run, copy out happens every single frame
+        cudaMemcpyAsync(buffers[0], blob.data(), in_numel * sizeof(float), cudaMemcpyHostToDevice, stream);
+        context->enqueueV3(stream);
+
+        std::vector<float> out_data(out_numel);
+        cudaMemcpyAsync(out_data.data(), buffers[1], out_numel * sizeof(float), cudaMemcpyDeviceToHost, stream);
+        cudaStreamSynchronize(stream);
+
+        std::vector<TBox> dets = postprocess(out_data.data(), n_anchors, n_classes,
                                               scale, pad_l, pad_t,
                                               frame.cols, frame.rows);
 
