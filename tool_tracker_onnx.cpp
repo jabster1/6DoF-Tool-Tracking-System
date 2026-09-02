@@ -9,7 +9,7 @@
  *   PENDING  → visible for CONFIRM_FRAMES consecutive frames → ACTIVE  (log DETECTED)
  *   ACTIVE   → absent ≥ 1 frame                              → MISSING (record timestamp)
  *   MISSING  → visible again                                 → ACTIVE
- *   MISSING  → absent ≥ ABSENT_FRAMES                        → REMOVED (log REMOVED)
+ *   MISSING  → absent ≥ ABSENT_SEC seconds                   → REMOVED (log REMOVED)
  *   MISSING  → absent ≥ ALERT_SEC seconds                    → log ALERT (once)
  *
  * Controls : q / ESC = quit   (writes session_summary.txt on exit)
@@ -49,9 +49,9 @@
 static constexpr int   INPUT_W         = 512;
 static constexpr int   INPUT_H         = 512;
 static constexpr float CONF_THRESHOLD  = 0.35f;  // threshold passed to ByteTrack, increased a little to filter out weak ghost detections
-static constexpr float NMS_IOU         = 0.45f;
+static constexpr float NMS_IOU         = 0.3f;   //accounts for how much overlap between bounding boxes before a tool disappears behind another
 static constexpr int   CONFIRM_FRAMES  = 5;      // consecutive visible frames before DETECTED
-static constexpr int   ABSENT_FRAMES   = 30;      // consecutive absent frames before REMOVED
+static constexpr double ABSENT_SEC     = 5.0;      // consecutive absent seconds before REMOVED
 static constexpr double ALERT_SEC      = 60.0;    // seconds absent before ALERT
 
 static const std::string MODEL_PATH    = "best.onnx";
@@ -635,8 +635,8 @@ int main() {
                     log_line(buf);
                 }
 
-                // Removal after ABSENT_FRAMES consecutive missing frames
-                if(r.absent_frames >= ABSENT_FRAMES) {
+                // Removal after ABSENT_SEC seconds missing
+                if(r.seconds_absent() >= ABSENT_SEC) {
                     r.state = ToolState::REMOVED;
                     char buf[140];
                     std::snprintf(buf,sizeof(buf),
