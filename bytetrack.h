@@ -305,7 +305,7 @@ struct BYTETracker {
 
     BYTETracker(float ht=0.5f,
                 float t1=0.8f, float t2=0.5f, float t3=0.7f,
-                int ml=30)
+                int ml=300)
         : high_thresh(ht), iou_thresh1(t1), iou_thresh2(t2),
           iou_thresh3(t3), max_lost(ml) {}
 
