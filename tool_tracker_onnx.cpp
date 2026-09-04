@@ -314,18 +314,27 @@ static void draw_hud(cv::Mat& frame,
 
     // ── Status panel (top-right) ──────────────────────────────────────────
     const int PW = 280, LHGT = 20, PAD = 6;
-    int panel_entries = 0;
-    for(const auto& [id,rec] : records)
-        if(rec.state != ToolState::REMOVED) ++panel_entries;
+    const int MAX_PANEL_ENTRIES = 10;
 
+    std::vector<const ToolRecord*> panel_list;
+    for(const auto& [id,rec] : records)
+        if(rec.state != ToolState::REMOVED) panel_list.push_back(&rec);
+
+    std::sort(panel_list.begin(), panel_list.end(),
+        [](const ToolRecord* a, const ToolRecord* b){ return a->last_seen_at > b->last_seen_at; });
+
+    if((int)panel_list.size() > MAX_PANEL_ENTRIES)
+        panel_list.resize(MAX_PANEL_ENTRIES);
+
+    int panel_entries = (int)panel_list.size();
     int ph = PAD + panel_entries * LHGT + PAD;
     int px = W - PW - 4, py = 4;
     cv::rectangle(frame,{px,py},{px+PW,py+ph},{30,30,30},-1);
     cv::rectangle(frame,{px,py},{px+PW,py+ph},{100,100,100},1);
 
     int ry = py + PAD + LHGT - 4;
-    for(const auto& [id, rec] : records) {
-        if(rec.state == ToolState::REMOVED) continue;
+    for(const auto* rec_ptr : panel_list) {
+        const ToolRecord& rec = *rec_ptr;
         char buf[80];
         cv::Scalar col;
         if(rec.state == ToolState::ACTIVE) {
