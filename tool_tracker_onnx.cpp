@@ -497,7 +497,7 @@ int main() {
     // high_thresh=0.5 splits detections; iou thresholds tuned for static tools
     BYTETracker tracker(/*high_thresh=*/0.50f,
                         /*iou_t1=*/0.80f, /*iou_t2=*/0.50f, /*iou_t3=*/0.70f,
-                        /*max_lost=*/30);
+                        /*max_lost=*/300);
 
     // ── Webcam ───────────────────────────────────────────────────────────
     cv::VideoCapture cap(0);
