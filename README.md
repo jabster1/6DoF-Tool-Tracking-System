@@ -29,7 +29,7 @@ In industrial environments such as gas turbine maintenance and aerospace manufac
 Webcam Feed
      │
      ▼
-YOLOv11 Inference (Python)
+YOLOv11 Inference
      │
      ├──▶ Bounding Box + Class Detection
      │
