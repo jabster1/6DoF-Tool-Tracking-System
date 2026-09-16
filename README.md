@@ -16,8 +16,10 @@ In industrial environments such as gas turbine maintenance and aerospace manufac
 - **Automated inference logging** — tool detections written to external log file with timestamps
 - **Targeted tool classes** — drill, pliers, screwdriver (expanding to full industrial toolset)
 - **Check-in / Check-out tracking** — monitors tools entering and leaving designated zones
-- **C++ deployment pipeline** via ONNX Runtime *(in development)*
-- **6-Degree-of-Freedom (6DoF) pose estimation** for precise spatial tool tracking *(in development)*
+- **C++ deployment pipeline** via ONNX Runtime
+- **Jetson Orin Nano and TensorRT Integration**
+- **IMU Sensor Fusion** for camera orientation and movement *(in development)*
+- **EKF State Estimation** for better 3D pose detection 
 
 ---
 
@@ -49,9 +51,9 @@ Webcam Feed ──▶ ONNX Runtime (C++ Inference) ──▶ 6DoF Pose Estimator
 |---|---|
 | Object Detection | YOLOv11 (Ultralytics) |
 | Computer Vision | OpenCV |
-| Language | Python 3.10+ → C++ (in development) |
-| Deployment | ONNX Runtime (in development) |
-| Logging | Python logging / external file output |
+| Language | Python 3.10+ → C++  |
+| Deployment | ONNX Runtime | TensorRT |
+| Logging | logging / external file output |
 
 ---
 
@@ -67,10 +69,10 @@ Webcam Feed ──▶ ONNX Runtime (C++ Inference) ──▶ 6DoF Pose Estimator
 | C++ inference pipeline via ONNX Runtime | ✅ Complete  |
 | ByteTrack implementation for linking detection across frames and apply specific ID to tools | ✅ Complete |
 | Logging to track and audit tools based on ID | ✅ Complete |
-| Quantization of model for Edge Devices | In Progress |
-| TensorRT implementation and Jetson Orin Nano Hardware Integration | In Progress |
-| 6DoF pose estimation integration | 📅 Planned |
-| Enterprise system integration | 📅 Planned |
+| Kalman Filter Implementation | ✅ Complete |
+| TensorRT implementation and Jetson Orin Nano Hardware Integration | ✅ Complete |
+| IMU Sensor Fusion Implementation | In Progress |
+| EKF State Estimation Extension | In Progress |
 
 ---
 
