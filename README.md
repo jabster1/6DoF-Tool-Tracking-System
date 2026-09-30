@@ -4,6 +4,17 @@ A real-time computer vision system for industrial tool tracking using a fine tun
 
 ---
 
+## Quickstart
+
+mkdir -p build && cd build
+cmake ..
+make -j$(nproc)
+./tool_tracker_trt
+
+Make sure your webcam is connected. Detections will be logged to `logs/tool_log.txt`.
+
+---
+
 ## Motivation
 
 In industrial environments such as gas turbine maintenance and aerospace manufacturing, a single tool left inside a unit can cause catastrophic equipment failure and unplanned shutdowns — costing millions in downtime and repairs. This system provides an automated, vision-based solution to track tools in real time, log their presence, and alert operators when tools leave or fail to return to a designated area.
@@ -45,6 +56,17 @@ Webcam Feed ──▶ ONNX Runtime (C++ Inference) ──▶ 6DoF Pose Estimator
 
 ---
 
+## Key Files
+
+| File | What it does |
+|---|---|
+| `tool_tracker_onnx.cpp` | Main C++ pipeline: YOLOv11 inference via ONNX Runtime, ByteTrack IDs, zone check-in/check-out logic |
+| `bytetrack.h` | Multi-object tracker linking detections across frames |
+| `imu_read.cpp` | BNO055 IMU bring-up over I2C; timestamped accel/gyro logging — the data source for sensor fusion |
+| `best.onnx` | Fine-tuned YOLOv11 weights (not in repo — see note below) |
+
+---
+
 ## Tech Stack
 
 | Component | Technology |
@@ -73,24 +95,6 @@ Webcam Feed ──▶ ONNX Runtime (C++ Inference) ──▶ 6DoF Pose Estimator
 | TensorRT implementation and Jetson Orin Nano Hardware Integration | ✅ Complete |
 | IMU Sensor Fusion Implementation with Arduino BNO055 and soldering/wiring to the Jetson | In Progress |
 | EKF State Estimation Extension | In Progress |
-
----
-
-## Getting Started
-
-### Prerequisites
-
-```bash
-pip install -r requirements.txt
-```
-
-### Run
-
-```bash
-python tool_tracker.py
-```
-
-Make sure your webcam is connected. Detections will be logged to `logs/tool_log.txt`.
 
 ---
 
