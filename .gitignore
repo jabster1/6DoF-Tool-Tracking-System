@@ -9,3 +9,6 @@ industrial-tools-v1.zip
 runs/
 build/
 tool_log.txt
+*.csv
+imu_read
+benchmark_results*.json
