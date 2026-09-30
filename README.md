@@ -6,10 +6,12 @@ A real-time computer vision system for industrial tool tracking using a fine tun
 
 ## Quickstart
 
+```bash
 mkdir -p build && cd build
 cmake ..
 make -j$(nproc)
 ./tool_tracker_trt
+```
 
 Make sure your webcam is connected. Detections will be logged to `logs/tool_log.txt`.
 
