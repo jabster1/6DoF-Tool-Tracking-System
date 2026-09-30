@@ -116,6 +116,6 @@ This system is being developed for deployment in **aerospace and power generatio
 
 **Jaden Barnwell**
 M.S. Computer Vision Candidate — University of Central Florida
-[GitHub](https://github.com/jabster1) | [LinkedIn](www.linkedin.com/in/jaden-barnwell-09734a212)
+[GitHub](https://github.com/jabster1) | [LinkedIn](https://linkedin.com/in/jaden-barnwell-09734a212)
 
 ---
