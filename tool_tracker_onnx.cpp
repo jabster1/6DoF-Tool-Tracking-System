@@ -534,6 +534,12 @@ int main() {
     context->setTensorAddress(in_name.c_str(), buffers[0]);
     context->setTensorAddress(out_name.c_str(), buffers[1]);
 
+    //begin video capture - begin writer
+    cv::VideoWriter writer("walk_" + wall_timestamp() + ".avi",
+    cv::VideoWriter::fourcc('M','J','P','G'), 30,
+    cv::Size(frame_width, frame_height));
+
+
     // ── Main loop ─────────────────────────────────────────────────────────
     //Loop through every frame
     while(true) {
@@ -667,6 +673,7 @@ int main() {
 
         // ── Draw + display ────────────────────────────────────────────────
         draw_hud(frame, records, fps, frame_idx);
+        writer.write(frame);          // write each frame for vid capture
         cv::imshow(WINDOW_TITLE, frame);
 
         int key = cv::waitKey(1) & 0xFF;
@@ -675,6 +682,8 @@ int main() {
 
     // ── Cleanup ───────────────────────────────────────────────────────────
     cap.release();
+    //release vid capture
+    writer.release();
     cv::destroyAllWindows();
 
     log_line("=== FOD Tool Tracker session ended " + wall_timestamp() + " ===\n");
