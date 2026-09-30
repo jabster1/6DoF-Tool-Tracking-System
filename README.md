@@ -71,7 +71,7 @@ Webcam Feed ──▶ ONNX Runtime (C++ Inference) ──▶ 6DoF Pose Estimator
 | Logging to track and audit tools based on ID | ✅ Complete |
 | Kalman Filter Implementation | ✅ Complete |
 | TensorRT implementation and Jetson Orin Nano Hardware Integration | ✅ Complete |
-| IMU Sensor Fusion Implementation | In Progress |
+| IMU Sensor Fusion Implementation with Arduino BNO055 and soldering/wiring to the Jetson | In Progress |
 | EKF State Estimation Extension | In Progress |
 
 ---
@@ -104,10 +104,11 @@ This system is being developed for deployment in **aerospace and power generatio
 
 - [ ] Fine-tune YOLOv11 on labeled industrial tool dataset
 - [ ] ONNX export and C++ inference pipeline
-- [ ] 6DoF pose estimation for spatial awareness
-- [ ] Zone-based alert system (tool left in restricted area)
 - [ ] Integration with enterprise logging/asset management systems
-- [ ] Edge deployment on embedded hardware (Jetson Nano / Raspberry Pi)
+- [ ] Edge deployment on embedded hardware (Jetson Nano / TensorRT)
+- [ ] IMU BNO055 sensor soldering, wiring to the jetson, and testing
+- [ ] IMU sensor fusion
+- [ ] EKF state estimation
 
 ---
 
@@ -115,6 +116,6 @@ This system is being developed for deployment in **aerospace and power generatio
 
 **Jaden Barnwell**
 M.S. Computer Vision Candidate — University of Central Florida
-[GitHub](https://github.com/jabster1) | [LinkedIn](https://linkedin.com/in/jadenbarnwell)
+[GitHub](https://github.com/jabster1) | [LinkedIn](www.linkedin.com/in/jaden-barnwell-09734a212)
 
 ---
