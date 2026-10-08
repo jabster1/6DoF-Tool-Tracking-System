@@ -1,5 +1,17 @@
-//bias calculation for sensor fusion and es-ekf step taken from csv - future implementation will gain bias numbers upon every startup
-//gx_bias=0.228 gy_bias=0.075 gz_bias=-0.045
+/*
+ * imu_read.cpp — BNO055 IMU timestamped data logger
+ *
+ * Hardware: Adafruit BNO055 breakout @ I2C address 0x28, bus 1 (Jetson Orin Nano).
+ * Sensor runs in NDOF fusion mode. Logs timestamped gyro/accel/mag samples to
+ * CSV at ~67 Hz effective rate for offline orientation-propagation experiments.
+ *
+ * Measured gyro biases (raw units, subtracted in post-processing):
+ *   bx = 0.228, by = 0.075, bz = -0.045
+ *
+ * Part of the 6DoF tool-tracking project: these recordings feed the
+ * Euler-vs-quaternion drift comparison and the error-state EKF pipeline.
+ */
+
 #include <fcntl.h>
 #include <unistd.h>
 #include <sys/ioctl.h>

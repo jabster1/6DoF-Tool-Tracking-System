@@ -1,5 +1,14 @@
-#es-ekf prep and analysis
-#calculate gyro degrees and test to see if calculations are accurate
+"""
+integrate.py — Offline EULER-ANGLE orientation propagation from IMU CSVs.
+
+Reads timestamped gyro samples from imu_read.cpp, subtracts the measured
+biases (bx=0.228, by=0.075, bz=-0.045), and integrates roll/pitch/yaw
+sequentially over the recording.
+
+Test profile: 0 deg -> 90 deg -> 0 deg over ~15 s.
+Results (baseline): 90.2 deg at the 90 deg hold; 21 deg pitch residual
+after returning to 0 deg. This file is the baseline
+"""
 
 import csv
 # Gyro biases from the stationary calibration run raw units
