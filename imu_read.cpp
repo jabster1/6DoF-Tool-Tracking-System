@@ -43,8 +43,7 @@ int main() {
         return (int16_t)((buf[1] << 8) | buf[0]);
     };
 
-    //1000 samples 10 ms apart gives us 10 seconds of data
-    for (int i = 0; i < 1000; i++) {
+    for (int i = 0; i < 5000; i++) {
         // force resisting gravity, if z=937 then 937/100 = 9.37 m/s^2
         int16_t ax = read16(0x08), ay = read16(0x0A), az = read16(0x0C);
         //angular velocity - how fast sensor is rotating (raw/16)
