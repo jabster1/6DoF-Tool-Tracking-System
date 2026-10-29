@@ -97,6 +97,16 @@ static std::string fmt_duration(double sec) {
     return std::to_string(m) + "m" + std::to_string(s) + "s";
 }
 
+// Filename-safe timestamp, e.g. 2026-10-29_07-45-00
+static std::string file_timestamp() {
+    std::string t = wall_timestamp();        // "2026-10-29 07:45:00"
+    for(char& ch : t) {                       // loop over each character, by reference so we can change it
+        if(ch == ' ') ch = '_';               // space -> underscore
+        else if(ch == ':') ch = '-';          // colon -> dash
+    }
+    return t;                                 // "2026-10-29_07-45-00"
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Logging
 // ─────────────────────────────────────────────────────────────────────────────
@@ -534,11 +544,17 @@ int main() {
     context->setTensorAddress(in_name.c_str(), buffers[0]);
     context->setTensorAddress(out_name.c_str(), buffers[1]);
 
-    //begin video capture - begin writer
-    cv::VideoWriter writer("walk_" + wall_timestamp() + ".avi",
-    cv::VideoWriter::fourcc('M','J','P','G'), 30,
-    cv::Size(frame_width, frame_height));
-
+    // ── Video recording ──────────────────────────────────────────────
+    // File is fixed at REC_FPS; the loop writes frames by the clock so
+    // playback is real-time even though the tracker runs ~50 FPS.
+    constexpr double REC_FPS = 30.0;
+    std::string rec_path = "walk_" + file_timestamp() + ".avi";
+    cv::VideoWriter writer(rec_path, cv::VideoWriter::fourcc('M','J','P','G'),
+                           REC_FPS, cv::Size(test.cols, test.rows));
+    if(!writer.isOpened()) { std::cerr << "ERROR: could not open " << rec_path << "\n"; return 1; }
+    std::cout << "Recording to " << rec_path << "\n";
+    long frames_written = 0;
+    TP   rec_start = Clock::now();
 
     // ── Main loop ─────────────────────────────────────────────────────────
     //Loop through every frame
@@ -673,7 +689,8 @@ int main() {
 
         // ── Draw + display ────────────────────────────────────────────────
         draw_hud(frame, records, fps, frame_idx);
-        writer.write(frame);          // write each frame for vid capture
+        long target = (long)(elapsed_sec(rec_start) * REC_FPS);
+        while(frames_written < target) { writer.write(frame); ++frames_written; }        
         cv::imshow(WINDOW_TITLE, frame);
 
         int key = cv::waitKey(1) & 0xFF;
@@ -684,6 +701,7 @@ int main() {
     cap.release();
     //release vid capture
     writer.release();
+    std::cout << "Saved video: " << rec_path << "\n";
     cv::destroyAllWindows();
 
     log_line("=== FOD Tool Tracker session ended " + wall_timestamp() + " ===\n");
