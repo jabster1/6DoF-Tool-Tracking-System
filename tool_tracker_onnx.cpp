@@ -42,6 +42,10 @@
 
 #include "bytetrack.h"
 
+#include <csignal>   // Ctrl+C handling
+#include <cstring>   // strncmp for parsing flags
+#include <thread>    // sleep_for (works without a window)
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Configuration
 // ─────────────────────────────────────────────────────────────────────────────
@@ -452,6 +456,50 @@ static void write_summary(const std::map<int,ToolRecord>& active_records,
     std::cout << "Session summary written to " << SUMMARY_FILE << "\n";
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Command-line options (no flags = original behaviour)
+// ─────────────────────────────────────────────────────────────────────────────
+struct Options {
+    bool        headless  = false;   // no window (SSH / battery)
+    bool        record    = false;   // save annotated video
+    std::string record_path;         // empty -> walk_<timestamp>.avi
+    bool        imu       = false;   // Step 3: start IMU + ESKF thread
+    bool        imu_comp  = false;   // Step 5: move ByteTrack predictions with camera rotation
+    std::string imu_log;             // Step 3: save raw IMU CSV
+    std::string calib_path;          // Step 4: camera.yaml from calibration
+    double      hfov_deg  = 70.0;    // Step 4: field of view if not calibrated
+    std::string cam_axes  = "+x,+y,+z";  // Step 4: IMU mounting on camera
+};
+
+static Options parse_args(int argc, char** argv) {
+    Options o;
+    auto next = [&](int& i) -> std::string {          // value after a flag, e.g. --hfov 70
+        if(i + 1 >= argc) { std::cerr << "Missing value after " << argv[i] << "\n"; std::exit(1); }
+        return argv[++i];
+    };
+    for(int i = 1; i < argc; ++i) {
+        std::string a = argv[i];
+        if     (a == "--headless") o.headless = true;
+        else if(a == "--record") {
+            o.record = true;                           // file name is optional
+            if(i + 1 < argc && std::strncmp(argv[i+1], "--", 2) != 0) o.record_path = argv[++i];
+        }
+        else if(a == "--imu")      o.imu = true;
+        else if(a == "--imu-comp") { o.imu = true; o.imu_comp = true; }
+        else if(a == "--imu-log")  o.imu_log    = next(i);
+        else if(a == "--calib")    o.calib_path = next(i);
+        else if(a == "--hfov")     o.hfov_deg   = std::stod(next(i));
+        else if(a == "--cam-axes") o.cam_axes   = next(i);
+        else { std::cerr << "Unknown option: " << a << "\n"; std::exit(1); }
+    }
+    return o;
+}
+
+// Ctrl+C sets this flag instead of killing the program, so the main loop
+// exits normally and the video file / logs get closed properly.
+static volatile std::sig_atomic_t g_stop = 0;
+static void on_sigint(int) { g_stop = 1; }
+
 class TRTLogger : public nvinfer1::ILogger {
     void log(Severity severity, const char* msg) noexcept override {
         if (severity <= Severity::kWARNING) std::cerr << msg << "\n";
@@ -463,7 +511,9 @@ class TRTLogger : public nvinfer1::ILogger {
 // main
 // ─────────────────────────────────────────────────────────────────────────────
 
-int main() {
+int main(int argc, char** argv) {
+    const Options opt = parse_args(argc, argv);
+    std::signal(SIGINT, on_sigint);     // Ctrl+C -> g_stop = 1
     // ── ONNX Runtime ─────────────────────────────────────────────────────
     /* Pre TensorRT - CPU
     Ort::Env env(ORT_LOGGING_LEVEL_WARNING, "tool_tracker");
@@ -516,14 +566,18 @@ int main() {
     }
 
     std::cout << "Warming up camera ...\n";
-    for(int i=0;i<10;++i){ cv::Mat t; cap.read(t); if(!t.empty()) break; cv::waitKey(100); }
+    //no waiting for monitor as it is a sleeping monitor and headless recording
+    for(int i=0;i<10;++i){ cv::Mat t; cap.read(t); if(!t.empty()) break; std::this_thread::sleep_for(std::chrono::milliseconds(100)); }
 
     cv::Mat test; cap.read(test);
     if(test.empty()){ std::cerr << "ERROR: Camera returned no frames.\n"; return 1; }
     std::cout << "Camera: " << test.cols << "×" << test.rows << "\n\n";
-    std::cout << "Controls: [q/ESC] quit\n\n";
 
-    cv::namedWindow(WINDOW_TITLE, cv::WINDOW_NORMAL);
+    if(opt.headless) std::cout << "Headless mode: no window. Stop with Ctrl+C.\n\n";
+    else {
+        std::cout << "Controls: [q/ESC] quit\n\n";
+        cv::namedWindow(WINDOW_TITLE, cv::WINDOW_NORMAL);
+    }
 
     // ── Per-track records + history ───────────────────────────────────────
     std::map<int, ToolRecord> records;   // keyed by ByteTrack track_id
@@ -548,17 +602,21 @@ int main() {
     // File is fixed at REC_FPS; the loop writes frames by the clock so
     // playback is real-time even though the tracker runs ~50 FPS.
     constexpr double REC_FPS = 30.0;
-    std::string rec_path = "walk_" + file_timestamp() + ".avi";
-    cv::VideoWriter writer(rec_path, cv::VideoWriter::fourcc('M','J','P','G'),
-                           REC_FPS, cv::Size(test.cols, test.rows));
-    if(!writer.isOpened()) { std::cerr << "ERROR: could not open " << rec_path << "\n"; return 1; }
-    std::cout << "Recording to " << rec_path << "\n";
+    std::string rec_path = opt.record_path.empty() ? ("walk_" + file_timestamp() + ".avi")
+                                                   : opt.record_path;
+    cv::VideoWriter writer;                          // stays closed unless --record
+    if(opt.record) {
+        writer.open(rec_path, cv::VideoWriter::fourcc('M','J','P','G'),
+                    REC_FPS, cv::Size(test.cols, test.rows));
+        if(!writer.isOpened()) { std::cerr << "ERROR: could not open " << rec_path << "\n"; return 1; }
+        std::cout << "Recording to " << rec_path << "\n";
+    }
     long frames_written = 0;
     TP   rec_start = Clock::now();
 
     // ── Main loop ─────────────────────────────────────────────────────────
     //Loop through every frame
-    while(true) {
+    while(!g_stop) {                    // Ctrl+C sets g_stop -> loop ends cleanly
         cv::Mat frame; cap.read(frame);
         if(frame.empty()) { std::cerr << "Warning: empty frame.\n"; continue; }
         ++frame_idx;
@@ -689,20 +747,24 @@ int main() {
 
         // ── Draw + display ────────────────────────────────────────────────
         draw_hud(frame, records, fps, frame_idx);
-        long target = (long)(elapsed_sec(rec_start) * REC_FPS);
-        while(frames_written < target) { writer.write(frame); ++frames_written; }        
-        cv::imshow(WINDOW_TITLE, frame);
 
-        int key = cv::waitKey(1) & 0xFF;
-        if(key == 'q' || key == 27) break;
+        if(opt.record) { //only writes frames when recording
+            long target = (long)(elapsed_sec(rec_start) * REC_FPS);
+            while(frames_written < target) { writer.write(frame); ++frames_written; }
+        }    
+
+        if(!opt.headless){ //ctrl c to stop only in headless mode, no window to press q in or to show in frame
+            cv::imshow(WINDOW_TITLE, frame);
+            int key = cv::waitKey(1) & 0xFF;
+            if(key == 'q' || key == 27) break;
+        }
     }
 
     // ── Cleanup ───────────────────────────────────────────────────────────
     cap.release();
     //release vid capture
-    writer.release();
-    std::cout << "Saved video: " << rec_path << "\n";
-    cv::destroyAllWindows();
+    if(opt.record) { writer.release(); std::cout << "Saved video: " << rec_path << "\n"; }
+    if(!opt.headless) cv::destroyAllWindows();
 
     log_line("=== FOD Tool Tracker session ended " + wall_timestamp() + " ===\n");
     g_log.close();
