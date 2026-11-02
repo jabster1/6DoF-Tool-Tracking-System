@@ -41,6 +41,7 @@
 //#include <onnxruntime_cxx_api.h>
 
 #include "bytetrack.h"
+#include "imu_estimator.h"   // BNO055 + ESKF running in a background thread, running eskf.h, bno055.h, and mat.h
 
 #include <csignal>   // Ctrl+C handling
 #include <cstring>   // strncmp for parsing flags
@@ -500,6 +501,21 @@ static Options parse_args(int argc, char** argv) {
 static volatile std::sig_atomic_t g_stop = 0;
 static void on_sigint(int) { g_stop = 1; }
 
+// IMU status bar along the bottom of the frame (shows up in recordings too)
+static void draw_imu_panel(cv::Mat& frame, const ImuState& s) {
+    const int H = frame.rows;
+    char buf[160];
+    if(!s.ready)
+        std::snprintf(buf, sizeof(buf), "IMU: calibrating - keep camera still...");
+    else
+        std::snprintf(buf, sizeof(buf), "IMU  roll %6.1f   pitch %6.1f   yaw %6.1f deg   (3s: %.1f/%.1f/%.1f)",
+                      s.roll_deg, s.pitch_deg, s.yaw_deg,
+                      s.sigma3_deg[0], s.sigma3_deg[1], s.sigma3_deg[2]);
+    cv::rectangle(frame, {0, H - 30}, {std::min(frame.cols, 620), H}, {20,20,20}, -1);  // dark strip
+    cv::putText(frame, buf, {8, H - 10}, cv::FONT_HERSHEY_SIMPLEX, 0.50,
+                {80,255,80}, 1, cv::LINE_AA);                                         // green text
+}
+
 class TRTLogger : public nvinfer1::ILogger {
     void log(Severity severity, const char* msg) noexcept override {
         if (severity <= Severity::kWARNING) std::cerr << msg << "\n";
@@ -579,6 +595,17 @@ int main(int argc, char** argv) {
         cv::namedWindow(WINDOW_TITLE, cv::WINDOW_NORMAL);
     }
 
+    // ── IMU optional : BNO055 + ESKF in a background thread ────────────
+    ImuEstimator imu;
+    bool imu_on = false;
+    if(opt.imu) {
+        ImuOptions io;
+        io.raw_log_path = opt.imu_log;      // --imu-log file.csv saves raw data (empty = no log)
+        imu_on = imu.start(io);             // opens /dev/i2c-1, checks chip ID, starts the thread
+        if(imu_on) std::cout << "IMU started - keep the camera STILL for 2 s while it calibrates.\n";
+        else       std::cerr << "WARNING: IMU not found (check wiring / i2cdetect -y -r 1). Running without it.\n";
+    }
+
     // ── Per-track records + history ───────────────────────────────────────
     std::map<int, ToolRecord> records;   // keyed by ByteTrack track_id
     std::vector<ToolRecord>   history;   // REMOVED records for session summary
@@ -621,6 +648,11 @@ int main(int argc, char** argv) {
         if(frame.empty()) { std::cerr << "Warning: empty frame.\n"; continue; }
         ++frame_idx;
         auto frame_start = Clock::now();
+        // ── IMU snapshot for this frame ──────────────────────────────────
+        // The IMU thread updates ~100x/s on its own; we just copy its newest
+        // estimate right after grabbing the frame, so both describe ~the same moment.
+        ImuState imu_s;                     // ready=false until calibration finishes
+        if(imu_on) imu_s = imu.latest();
 
         // ── Inference ────────────────────────────────────────────────────
         float scale; int pad_l, pad_t;
@@ -747,6 +779,17 @@ int main(int argc, char** argv) {
 
         // ── Draw + display ────────────────────────────────────────────────
         draw_hud(frame, records, fps, frame_idx);
+        if(imu_on) {
+            draw_imu_panel(frame, imu_s);
+
+            // Once per second, also print to the terminal (useful in --headless)
+            static TP last_imu_print = Clock::now();
+            if(imu_s.ready && elapsed_sec(last_imu_print) >= 1.0) {
+                std::printf("IMU t=%.0fs  roll %.1f  pitch %.1f  yaw %.1f deg\n",
+                            imu_s.t, imu_s.roll_deg, imu_s.pitch_deg, imu_s.yaw_deg);
+                last_imu_print = Clock::now();
+            }
+        }
 
         if(opt.record) { //only writes frames when recording
             long target = (long)(elapsed_sec(rec_start) * REC_FPS);
@@ -765,6 +808,7 @@ int main(int argc, char** argv) {
     //release vid capture
     if(opt.record) { writer.release(); std::cout << "Saved video: " << rec_path << "\n"; }
     if(!opt.headless) cv::destroyAllWindows();
+    imu.stop();    // tells the IMU thread to finish its loop, then waits for it 
 
     log_line("=== FOD Tool Tracker session ended " + wall_timestamp() + " ===\n");
     g_log.close();
