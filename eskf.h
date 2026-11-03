@@ -44,10 +44,17 @@ struct Calibration {
 
 // Compute calibration from samples taken while the sensor is STILL.
 // gyro in rad/s, accel in raw units (only direction is used).
-inline Calibration calibrate(const std::vector<Vec3>& gyro,
-                             const std::vector<Vec3>& accel,
+inline Calibration calibrate(const std::vector<Vec3>& gyro_in,
+                             const std::vector<Vec3>& accel_in,
                              const Config& cfg) {
     Calibration c;
+
+    // Skip all-zero accel readings (BNO055 returns zeros right after a mode switch; 0/0 = NaN)
+    std::vector<Vec3> gyro_ok, accel_ok;
+    for (size_t i = 0; i < accel_in.size(); ++i)
+        if (accel_in[i].norm() > 1e-6) { gyro_ok.push_back(gyro_in[i]); accel_ok.push_back(accel_in[i]); }
+    const std::vector<Vec3>& gyro  = gyro_ok;
+    const std::vector<Vec3>& accel = accel_ok;
     const int n = (int)gyro.size();
 
     // gyro bias = mean, noise = population std averaged over axes (same as numpy .std())
@@ -136,6 +143,7 @@ public:
     bool update_accel(const Vec3& accel) {
         if (!use_accel_) return false;
         double norm = accel.norm();
+        if (norm < 1e-6) return false;   // no reading (all zeros)
         if (std::abs(norm / g_ref_ - 1.0) > cfg_.accel_gate) return false;   // board moving
 
         Vec3 z = accel * (1.0 / norm);                  // measured "up" (sensor frame)
