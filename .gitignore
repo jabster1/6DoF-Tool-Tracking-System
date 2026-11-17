@@ -12,3 +12,4 @@ tool_log.txt
 *.csv
 imu_read
 benchmark_results*.json
+calib_images/
