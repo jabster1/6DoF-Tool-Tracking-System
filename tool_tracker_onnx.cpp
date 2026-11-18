@@ -691,6 +691,21 @@ int main(int argc, char** argv) {
         ImuState imu_s;                     // ready=false until calibration finishes
         if(imu_on) imu_s = imu.latest();
 
+
+        // ── Camera orientation + pixel motion ───────────────────
+        Homography H_cam{};          // how the image moved since last frame
+        bool  have_H = false;
+        float cross_x = -100, cross_y = -100;   // crosshair position (off-screen until ready)
+        if(imu_on && imu_s.ready) {
+            eskf::Mat3 R_wc = camera_orientation(imu_s.q, R_bc);      // camera -> world
+            if(have_prev) { H_cam = rotation_homography(cam, R_wc_prev, R_wc); have_H = true; }
+            if(!have_anchor) { R_anchor = R_wc; have_anchor = true; }
+            Homography H_anchor = rotation_homography(cam, R_anchor, R_wc);
+            if(!apply_homography(H_anchor, (float)cam.cx, (float)cam.cy, cross_x, cross_y))
+                cross_x = cross_y = -100;                              // behind camera: hide it
+            R_wc_prev = R_wc; have_prev = true;
+        }
+
         // ── Inference ────────────────────────────────────────────────────
         float scale; int pad_l, pad_t;
         auto blob = preprocess(frame, scale, pad_l, pad_t);
