@@ -502,19 +502,25 @@ static Options parse_args(int argc, char** argv) {
 static volatile std::sig_atomic_t g_stop = 0;
 static void on_sigint(int) { g_stop = 1; }
 
-// IMU status bar along the bottom of the frame (shows up in recordings too)
-static void draw_imu_panel(cv::Mat& frame, const ImuState& s) {
+// IMU status bar (bottom) + world-locked crosshair.
+static void draw_imu_panel(cv::Mat& frame, const ImuState& s, bool comp_on,
+                           float cross_x, float cross_y) {
     const int H = frame.rows;
     char buf[160];
     if(!s.ready)
         std::snprintf(buf, sizeof(buf), "IMU: calibrating - keep camera still...");
     else
-        std::snprintf(buf, sizeof(buf), "IMU  roll %6.1f   pitch %6.1f   yaw %6.1f deg   (3s: %.1f/%.1f/%.1f)",
-                      s.roll_deg, s.pitch_deg, s.yaw_deg,
-                      s.sigma3_deg[0], s.sigma3_deg[1], s.sigma3_deg[2]);
-    cv::rectangle(frame, {0, H - 30}, {std::min(frame.cols, 620), H}, {20,20,20}, -1);  // dark strip
+        std::snprintf(buf, sizeof(buf), "IMU roll %6.1f  pitch %6.1f  yaw %6.1f | comp %s",
+                      s.roll_deg, s.pitch_deg, s.yaw_deg, comp_on ? "ON" : "OFF");
+    cv::rectangle(frame, {0, H - 30}, {std::min(frame.cols, 560), H}, {20,20,20}, -1);
     cv::putText(frame, buf, {8, H - 10}, cv::FONT_HERSHEY_SIMPLEX, 0.50,
-                {80,255,80}, 1, cv::LINE_AA);                                         // green text
+                comp_on ? cv::Scalar(80,255,80) : cv::Scalar(220,220,220), 1, cv::LINE_AA);
+
+    // Crosshair: marks the scene point that was at the image centre at startup.
+    // If --cam-axes and K are right, it stays glued to that object as you rotate.
+    cv::Point c((int)cross_x, (int)cross_y);
+    cv::drawMarker(frame, c, {0,255,255}, cv::MARKER_CROSS, 30, 2);
+    cv::circle(frame, c, 18, {0,255,255}, 1, cv::LINE_AA);
 }
 
 // Camera intrinsics K from camera.yaml (--calib), else estimated from --hfov.
@@ -832,7 +838,7 @@ int main(int argc, char** argv) {
         // ── Draw + display ────────────────────────────────────────────────
         draw_hud(frame, records, fps, frame_idx);
         if(imu_on) {
-            draw_imu_panel(frame, imu_s);
+            draw_imu_panel(frame, imu_s, comp_on, cross_x, cross_y);
 
             // Once per second, also print to the terminal (useful in --headless)
             static TP last_imu_print = Clock::now();
