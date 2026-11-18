@@ -42,6 +42,7 @@
 
 #include "bytetrack.h"
 #include "imu_estimator.h"   // BNO055 + ESKF running in a background thread, running eskf.h, bno055.h, and mat.h
+#include "camera_motion.h"   // IMU rotation -> pixel motion (K, R_bc, H)
 
 #include <csignal>   // Ctrl+C handling
 #include <cstring>   // strncmp for parsing flags
@@ -516,6 +517,25 @@ static void draw_imu_panel(cv::Mat& frame, const ImuState& s) {
                 {80,255,80}, 1, cv::LINE_AA);                                         // green text
 }
 
+// Camera intrinsics K from camera.yaml (--calib), else estimated from --hfov.
+static CameraModel load_camera(const Options& o, int width, int height) {
+    if(!o.calib_path.empty()) {
+        cv::FileStorage fs(o.calib_path, cv::FileStorage::READ);
+        cv::Mat Kc;
+        if(fs.isOpened()) fs["camera_matrix"] >> Kc;
+        if(!Kc.empty()) {
+            Kc.convertTo(Kc, CV_64F);
+            CameraModel K;
+            K.fx = Kc.at<double>(0,0); K.fy = Kc.at<double>(1,1);   // focal lengths (px)
+            K.cx = Kc.at<double>(0,2); K.cy = Kc.at<double>(1,2);   // image centre (px)
+            K.from_calibration = true;
+            return K;
+        }
+        std::cerr << "WARNING: could not read camera_matrix from " << o.calib_path << ", using --hfov\n";
+    }
+    return camera_from_hfov(width, height, o.hfov_deg);             // fallback estimate
+}
+
 class TRTLogger : public nvinfer1::ILogger {
     void log(Severity severity, const char* msg) noexcept override {
         if (severity <= Severity::kWARNING) std::cerr << msg << "\n";
@@ -605,6 +625,23 @@ int main(int argc, char** argv) {
         if(imu_on) std::cout << "IMU started - keep the camera STILL for 2 s while it calibrates.\n";
         else       std::cerr << "WARNING: IMU not found (check wiring / i2cdetect -y -r 1). Running without it.\n";
     }
+
+    // ── Camera model + IMU mounting ─────────────────────────────
+    eskf::Mat3  R_bc = eskf::Mat3::Identity();          // IMU -> camera mounting rotation
+    CameraModel cam  = load_camera(opt, test.cols, test.rows);
+    bool        comp_on = opt.imu_comp && imu_on;       // Step 5 uses this
+    if(imu_on) {
+        std::string err;
+        if(!parse_cam_axes(opt.cam_axes, R_bc, err)) {
+            std::cerr << "--cam-axes: " << err << "\n"; return 1;
+        }
+        std::printf("Camera model: fx=%.1f fy=%.1f cx=%.1f cy=%.1f (%s)  axes %s  comp %s\n",
+                    cam.fx, cam.fy, cam.cx, cam.cy,
+                    cam.from_calibration ? "calibrated" : "estimated from --hfov",
+                    opt.cam_axes.c_str(), comp_on ? "ON" : "OFF");
+    }
+    eskf::Mat3 R_wc_prev, R_anchor;                      // previous frame's / crosshair's camera orientation
+    bool have_prev = false, have_anchor = false;
 
     // ── Per-track records + history ───────────────────────────────────────
     std::map<int, ToolRecord> records;   // keyed by ByteTrack track_id
