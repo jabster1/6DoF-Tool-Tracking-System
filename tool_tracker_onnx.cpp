@@ -510,9 +510,10 @@ static void draw_imu_panel(cv::Mat& frame, const ImuState& s, bool comp_on,
     if(!s.ready)
         std::snprintf(buf, sizeof(buf), "IMU: calibrating - keep camera still...");
     else
-        std::snprintf(buf, sizeof(buf), "IMU roll %6.1f  pitch %6.1f  yaw %6.1f | comp %s",
-                      s.roll_deg, s.pitch_deg, s.yaw_deg, comp_on ? "ON" : "OFF");
-    cv::rectangle(frame, {0, H - 30}, {std::min(frame.cols, 560), H}, {20,20,20}, -1);
+        std::snprintf(buf, sizeof(buf), "IMU roll %6.1f  pitch %6.1f  yaw %6.1f | comp %s | IDs %d",
+                      s.roll_deg, s.pitch_deg, s.yaw_deg, comp_on ? "ON" : "OFF",
+                      BYTETracker::tracks_created());
+    cv::rectangle(frame, {0, H - 30}, {frame.cols, H}, {20,20,20}, -1);
     cv::putText(frame, buf, {8, H - 10}, cv::FONT_HERSHEY_SIMPLEX, 0.50,
                 comp_on ? cv::Scalar(80,255,80) : cv::Scalar(220,220,220), 1, cv::LINE_AA);
 
@@ -740,7 +741,7 @@ int main(int argc, char** argv) {
                                               frame.cols, frame.rows);
 
         // ── ByteTrack update ─────────────────────────────────────────────
-        std::vector<TrackedBox> active_tracks = tracker.update(dets);
+        std::vector<TrackedBox> active_tracks = tracker.update(dets, (comp_on && have_H) ? &H_cam : nullptr);
 
         // Which track IDs are visible this frame
         std::map<int, TrackedBox> visible;
@@ -867,6 +868,8 @@ int main(int argc, char** argv) {
     if(opt.record) { writer.release(); std::cout << "Saved video: " << rec_path << "\n"; }
     if(!opt.headless) cv::destroyAllWindows();
     imu.stop();    // tells the IMU thread to finish its loop, then waits for it 
+    std::printf("Track IDs created this session: %d (IMU compensation %s)\n",
+            BYTETracker::tracks_created(), comp_on ? "ON" : "OFF");
 
     log_line("=== FOD Tool Tracker session ended " + wall_timestamp() + " ===\n");
     g_log.close();

@@ -284,6 +284,17 @@ struct STrack {
         state             = STrackState::Tracked;
     }
 
+    // Move this track's predicted centre by the camera-rotation homography H
+    // (row-major 3x3). Called after predict(), before IoU matching.
+    void warp(const std::array<float,9>& H) {
+        float x = kf.x[0], y = kf.x[1];               // predicted box centre (pixels)
+        float w = H[6]*x + H[7]*y + H[8];             // projective divisor
+        if (w <= 1e-6f) return;                       // point went behind camera, skip
+        kf.x[0] = (H[0]*x + H[1]*y + H[2]) / w;       // new centre x
+        kf.x[1] = (H[3]*x + H[4]*y + H[5]) / w;       // new centre y
+        box = kf.predicted_box(score, cls);           // rebuild the box from the KF state
+    }
+
     TrackedBox to_tracked() const {
         return {box.x1,box.y1,box.x2,box.y2, score, cls, id};
     }
@@ -332,8 +343,12 @@ struct BYTETracker {
                 C[i][j] = 1.f - tbox_iou(tracks[i]->box, dets[j]);
         return C;
     }
+    
+    // Total track IDs handed out this session (fewer = fewer ID switches).
+    static int tracks_created() { return STrack::next_id; }
 
-    std::vector<TrackedBox> update(const std::vector<TBox>& detections) {
+    std::vector<TrackedBox> update(const std::vector<TBox>& detections,
+                                   const std::array<float,9>* camera_motion = nullptr) {
         // ── Split detections ─────────────────────────────────────────────
         std::vector<TBox> det_hi, det_lo;
         for(const auto& d : detections)
@@ -343,9 +358,19 @@ struct BYTETracker {
         for(auto& t : tracked) t.predict();
         for(auto& t : lost)    t.predict();
 
+
+        // IMU ego-motion compensation: shift every predicted box by the
+        // camera's rotation since last frame, so IoU matching compares
+        // against where the object actually is in THIS frame.
+        if(camera_motion) {
+            for(auto& t : tracked) t.warp(*camera_motion);
+            for(auto& t : lost)    t.warp(*camera_motion);
+        }
+
         // ── Stage 1: high-conf dets → active tracked tracks ──────────────
         std::vector<int> unmatched_trk1;
         std::vector<bool> hi_used(det_hi.size(), false);
+
 
         if(!tracked.empty() && !det_hi.empty()) {
             auto C    = iou_cost(tracked, det_hi);
